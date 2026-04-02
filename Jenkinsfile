@@ -45,5 +45,30 @@ pipeline {
                 sh 'docker build -t sample-java-app:build-${BUILD_NUMBER} .'
             }
         }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh '''
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      -v trivy_cache:/root/.cache/ \
+                      -v "$WORKSPACE:/work" \
+                      aquasec/trivy:0.62.0 image \
+                      --severity HIGH,CRITICAL \
+                      --ignore-unfixed \
+                      --no-progress \
+                      --format table \
+                      --output /work/trivy-image-report.txt \
+                      --exit-code 0 \
+                      sample-java-app:build-${BUILD_NUMBER}
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'trivy-image-report.txt', fingerprint: true
+        }
     }
 }
