@@ -22,10 +22,14 @@ pipeline {
             }
         }
 
-        stage('SonarQube Env') {
+        stage('SonarQube Scan') {
             steps {
                 withSonarQubeEnv('sonarqube-local') {
-                    echo 'Connected to SonarQube from SCM pipeline'
+                    sh '''
+                        mvn sonar:sonar \
+                          -Dsonar.projectKey=sample-java-app \
+                          -Dsonar.projectName=sample-java-app
+                    '''
                 }
             }
         }
