@@ -52,7 +52,7 @@ pipeline {
                     docker run --rm \
                       -v /var/run/docker.sock:/var/run/docker.sock \
                       -v trivy_cache:/root/.cache/ \
-                      -v "$WORKSPACE:/work" \
+                      -v "$PWD:/work" \
                       aquasec/trivy:0.62.0 image \
                       --severity HIGH,CRITICAL \
                       --ignore-unfixed \
