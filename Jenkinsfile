@@ -16,6 +16,12 @@ pipeline {
             }
         }
 
+        stage('Maven Test') {
+            steps {
+                sh 'mvn clean test'
+            }
+        }
+
         stage('SonarQube Env') {
             steps {
                 withSonarQubeEnv('sonarqube-local') {
