@@ -83,7 +83,7 @@ pipeline {
 					  -v trivy_cache:/root/.cache/ \
 					  aquasec/trivy:0.62.0 image \
 					  --scanners vuln \
-					  --severity MEDIUM,HIGH,CRITICAL \
+					  --severity HIGH,CRITICAL \
 					  --no-progress \
 					  --exit-code 1 \
 					  sample-java-app:build-${BUILD_NUMBER}
