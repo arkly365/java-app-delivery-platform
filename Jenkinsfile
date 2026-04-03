@@ -55,22 +55,39 @@ pipeline {
             }
         }
 
-        stage('Trivy Image Scan') {
+        stage('Trivy Report') {
 			steps {
 				sh '''
 					docker run --rm \
 					  -v /var/run/docker.sock:/var/run/docker.sock \
 					  -v trivy_cache:/root/.cache/ \
 					  aquasec/trivy:0.62.0 image \
+					  --scanners vuln \
 					  --severity MEDIUM,HIGH,CRITICAL \
 					  --no-progress \
 					  --format table \
-					  --exit-code 1 \
+					  --exit-code 0 \
 					  sample-java-app:build-${BUILD_NUMBER} \
 					  > trivy-image-report.txt
 				'''
 				sh 'ls -la'
 				sh 'test -f trivy-image-report.txt'
+			}
+		}
+
+		stage('Trivy Security Gate') {
+			steps {
+				sh '''
+					docker run --rm \
+					  -v /var/run/docker.sock:/var/run/docker.sock \
+					  -v trivy_cache:/root/.cache/ \
+					  aquasec/trivy:0.62.0 image \
+					  --scanners vuln \
+					  --severity MEDIUM,HIGH,CRITICAL \
+					  --no-progress \
+					  --exit-code 1 \
+					  sample-java-app:build-${BUILD_NUMBER}
+				'''
 			}
 		}
     }
