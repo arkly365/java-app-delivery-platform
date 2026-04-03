@@ -95,6 +95,22 @@ pipeline {
                 sh 'docker push ${IMAGE_NAME}:latest'
             }
         }
+		
+		stage('Push to Private Registry') {
+			steps {
+				sh '''
+					docker tag sample-java-app:build-${BUILD_NUMBER} \
+					  localhost:5000/sample-java-app:build-${BUILD_NUMBER}
+
+					docker tag sample-java-app:build-${BUILD_NUMBER} \
+					  localhost:5000/sample-java-app:latest
+
+					docker push localhost:5000/sample-java-app:build-${BUILD_NUMBER}
+					docker push localhost:5000/sample-java-app:latest
+				'''
+			}
+		}
+		
     }
 
     post {
