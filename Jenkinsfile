@@ -133,7 +133,18 @@ pipeline {
                 '''
             }
         }
+		
+		stage('Verify Deployment') {
+			steps {
+				sh '''
+					sleep 10
+					curl -f http://host.docker.internal:8081/hello
+				'''
+			}
+		}
+
     }
+	
 
     post {
         always {
