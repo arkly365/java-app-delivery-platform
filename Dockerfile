@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jre
+FROM ubuntu:20.04
 
 WORKDIR /app
 
