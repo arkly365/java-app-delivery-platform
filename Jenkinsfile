@@ -57,7 +57,7 @@ pipeline {
 					  --ignore-unfixed \
 					  --no-progress \
 					  --format table \
-					  --exit-code 0 \
+					  --exit-code 1 \
 					  sample-java-app:build-${BUILD_NUMBER} \
 					  > trivy-image-report.txt
 				'''
