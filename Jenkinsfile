@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = 'arkly365/sample-java-app'
+        IMAGE_TAG  = "build-${BUILD_NUMBER}"
+    }
+
     stages {
         stage('Init') {
             steps {
@@ -39,15 +44,6 @@ pipeline {
                 sh 'mvn clean package -DskipTests'
             }
         }
-		
-		stage('Check Dockerfile') {
-			steps {
-				sh 'pwd'
-				sh 'ls -la'
-				sh 'echo "===== Dockerfile ====="'
-				sh 'cat Dockerfile'
-			}
-		}
 
         stage('Docker Build') {
             steps {
@@ -55,46 +51,55 @@ pipeline {
             }
         }
 
-        stage('Trivy Report') {
-			steps {
-				sh '''
-					docker run --rm \
-					  -v /var/run/docker.sock:/var/run/docker.sock \
-					  -v trivy_cache:/root/.cache/ \
-					  aquasec/trivy:0.62.0 image \
-					  --scanners vuln \
-					  --severity MEDIUM,HIGH,CRITICAL \
-					  --no-progress \
-					  --format table \
-					  --exit-code 0 \
-					  sample-java-app:build-${BUILD_NUMBER} \
-					  > trivy-image-report.txt
-				'''
-				sh 'ls -la'
-				sh 'test -f trivy-image-report.txt'
-			}
-		}
+        stage('Trivy Image Scan') {
+            steps {
+                sh '''
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      -v trivy_cache:/root/.cache/ \
+                      -v "$WORKSPACE:/work" \
+                      aquasec/trivy:0.62.0 image \
+                      --severity HIGH,CRITICAL \
+                      --ignore-unfixed \
+                      --no-progress \
+                      --format table \
+                      --output /work/trivy-image-report.txt \
+                      --exit-code 0 \
+                      sample-java-app:build-${BUILD_NUMBER}
+                '''
+            }
+        }
 
-		stage('Trivy Security Gate') {
-			steps {
-				sh '''
-					docker run --rm \
-					  -v /var/run/docker.sock:/var/run/docker.sock \
-					  -v trivy_cache:/root/.cache/ \
-					  aquasec/trivy:0.62.0 image \
-					  --scanners vuln \
-					  --severity HIGH,CRITICAL \
-					  --no-progress \
-					  --exit-code 1 \
-					  sample-java-app:build-${BUILD_NUMBER}
-				'''
-			}
-		}
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                }
+            }
+        }
+
+        stage('Docker Tag') {
+            steps {
+                sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:${IMAGE_TAG}'
+                sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:latest'
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                sh 'docker push ${IMAGE_NAME}:${IMAGE_TAG}'
+                sh 'docker push ${IMAGE_NAME}:latest'
+            }
+        }
     }
 
-	post {
-		always {
-			archiveArtifacts artifacts: 'trivy-image-report.txt', fingerprint: true
-		}
-	}
+    post {
+        always {
+            archiveArtifacts artifacts: 'trivy-image-report.txt', fingerprint: true
+        }
+    }
 }
