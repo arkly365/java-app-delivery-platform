@@ -4,6 +4,8 @@ pipeline {
     environment {
         IMAGE_NAME = 'arkly365/sample-java-app'
         IMAGE_TAG  = "build-${BUILD_NUMBER}"
+        PRIVATE_REGISTRY_IMAGE = "localhost:5000/sample-java-app"
+        CONTAINER_NAME = 'sample-java-app-deploy'
     }
 
     stages {
@@ -39,6 +41,14 @@ pipeline {
             }
         }
 
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
         stage('Maven Package') {
             steps {
                 sh 'mvn clean package -DskipTests'
@@ -64,13 +74,13 @@ pipeline {
                       --no-progress \
                       --format table \
                       --output /work/trivy-image-report.txt \
-                      --exit-code 0 \
+                      --exit-code 1 \
                       sample-java-app:build-${BUILD_NUMBER}
                 '''
             }
         }
 
-        stage('Docker Login') {
+        stage('Docker Hub Login') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
@@ -82,35 +92,47 @@ pipeline {
             }
         }
 
-        stage('Docker Tag') {
+        stage('Docker Hub Tag') {
             steps {
                 sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:${IMAGE_TAG}'
                 sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:latest'
             }
         }
 
-        stage('Docker Push') {
+        stage('Docker Hub Push') {
             steps {
                 sh 'docker push ${IMAGE_NAME}:${IMAGE_TAG}'
                 sh 'docker push ${IMAGE_NAME}:latest'
             }
         }
-		
-		stage('Push to Private Registry') {
-			steps {
-				sh '''
-					docker tag sample-java-app:build-${BUILD_NUMBER} \
-					  localhost:5000/sample-java-app:build-${BUILD_NUMBER}
 
-					docker tag sample-java-app:build-${BUILD_NUMBER} \
-					  localhost:5000/sample-java-app:latest
+        stage('Push to Private Registry') {
+            steps {
+                sh '''
+                    docker tag sample-java-app:build-${BUILD_NUMBER} \
+                      ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
 
-					docker push localhost:5000/sample-java-app:build-${BUILD_NUMBER}
-					docker push localhost:5000/sample-java-app:latest
-				'''
-			}
-		}
-		
+                    docker tag sample-java-app:build-${BUILD_NUMBER} \
+                      ${PRIVATE_REGISTRY_IMAGE}:latest
+
+                    docker push ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
+                    docker push ${PRIVATE_REGISTRY_IMAGE}:latest
+                '''
+            }
+        }
+
+        stage('Deploy from Private Registry') {
+            steps {
+                sh '''
+                    docker rm -f ${CONTAINER_NAME} || true
+
+                    docker run -d \
+                      --name ${CONTAINER_NAME} \
+                      -p 8081:8080 \
+                      ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
+                '''
+            }
+        }
     }
 
     post {
