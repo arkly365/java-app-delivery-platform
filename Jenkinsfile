@@ -39,6 +39,15 @@ pipeline {
                 sh 'mvn clean package -DskipTests'
             }
         }
+		
+		stage('Check Dockerfile') {
+			steps {
+				sh 'pwd'
+				sh 'ls -la'
+				sh 'echo "===== Dockerfile ====="'
+				sh 'cat Dockerfile'
+			}
+		}
 
         stage('Docker Build') {
             steps {
@@ -53,8 +62,7 @@ pipeline {
 					  -v /var/run/docker.sock:/var/run/docker.sock \
 					  -v trivy_cache:/root/.cache/ \
 					  aquasec/trivy:0.62.0 image \
-					  --severity HIGH,CRITICAL \
-					  --ignore-unfixed \
+					  --severity MEDIUM,HIGH,CRITICAL \
 					  --no-progress \
 					  --format table \
 					  --exit-code 1 \
