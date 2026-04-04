@@ -1,17 +1,33 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['dev', 'prod'],
+            description: '選擇本次 build / deploy 的目標環境'
+        )
+    }
+
     environment {
         IMAGE_NAME = 'arkly365/sample-java-app'
-        IMAGE_TAG = "build-${BUILD_NUMBER}"
+        IMAGE_TAG  = "build-${BUILD_NUMBER}-${params.TARGET_ENV}"
         PRIVATE_REGISTRY_IMAGE = "localhost:5000/sample-java-app"
-        CONTAINER_NAME = 'sample-java-app-deploy'
+        CONTAINER_NAME = "sample-java-app-${params.TARGET_ENV}"
     }
 
     stages {
         stage('Init') {
             steps {
                 echo 'Pipeline from SCM started'
+            }
+        }
+		
+		stage('Show Build Parameters') {
+            steps {
+                echo "TARGET_ENV = ${params.TARGET_ENV}"
+                echo "IMAGE_TAG  = ${env.IMAGE_TAG}"
+                echo "CONTAINER_NAME = ${env.CONTAINER_NAME}"
             }
         }
 
