@@ -32,7 +32,7 @@ pipeline {
                     env.GIT_BRANCH_NAME = gitBranch
 
                     def autoEnv = 'dev'
-                    if (gitBranch == 'main') {
+                    if (gitBranch == 'main' || gitBranch == 'master') {
                         autoEnv = 'prod'
                     } else if (gitBranch == 'develop') {
                         autoEnv = 'dev'
