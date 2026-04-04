@@ -122,18 +122,27 @@ pipeline {
             }
         }
 
-        stage('Deploy from Private Registry') {
-            steps {
-                sh '''
-                    docker rm -f ${CONTAINER_NAME} || true
+		stage('Deploy from Private Registry') {
+			steps {
+				sh '''
+					echo "Checking containers using port 8081..."
+					OLD_CONTAINERS=$(docker ps -q --filter "publish=8081")
+					if [ -n "$OLD_CONTAINERS" ]; then
+					  echo "Removing containers using port 8081: $OLD_CONTAINERS"
+					  docker rm -f $OLD_CONTAINERS
+					else
+					  echo "No containers are using port 8081"
+					fi
 
-                    docker run -d \
-                      --name ${CONTAINER_NAME} \
-                      -p 8081:8080 \
-                      ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
-                '''
-            }
-        }
+					docker rm -f sample-java-app-deploy || true
+
+					docker run -d \
+					  --name sample-java-app-deploy \
+					  -p 8081:8080 \
+					  localhost:5000/sample-java-app:build-${BUILD_NUMBER}
+				'''
+			}
+		}
 		
 		stage('Verify Deployment') {
 			steps {
