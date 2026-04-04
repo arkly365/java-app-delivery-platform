@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = 'arkly365/sample-java-app'
-        IMAGE_TAG  = "build-${BUILD_NUMBER}"
+        IMAGE_TAG = "build-${BUILD_NUMBER}"
         PRIVATE_REGISTRY_IMAGE = "localhost:5000/sample-java-app"
         CONTAINER_NAME = 'sample-java-app-deploy'
     }
@@ -43,7 +43,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 2, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -61,25 +61,25 @@ pipeline {
             }
         }
 
-		stage('Trivy Image Scan') {
-			steps {
-				sh '''
-					docker run --rm \
-					  -v /var/run/docker.sock:/var/run/docker.sock \
-					  -v trivy_cache:/root/.cache/ \
-					  -v "$WORKSPACE:/work" \
-					  aquasec/trivy:0.62.0 image \
-					  --scanners vuln \
-					  --severity HIGH,CRITICAL \
-					  --ignore-unfixed \
-					  --no-progress \
-					  --format table \
-					  --output /work/trivy-image-report.txt \
-					  --exit-code 0 \
-					  sample-java-app:build-${BUILD_NUMBER}
-				'''
-			}
-		}
+        stage('Trivy Image Scan') {
+            steps {
+                sh '''
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      -v trivy_cache:/root/.cache/ \
+                      -v "$WORKSPACE:/work" \
+                      aquasec/trivy:0.62.0 image \
+                      --scanners vuln \
+                      --severity HIGH,CRITICAL \
+                      --ignore-unfixed \
+                      --no-progress \
+                      --format table \
+                      --output /work/trivy-image-report.txt \
+                      --exit-code 1 \
+                      sample-java-app:build-${BUILD_NUMBER}
+                '''
+            }
+        }
 
         stage('Docker Hub Login') {
             steps {
@@ -122,39 +122,37 @@ pipeline {
             }
         }
 
-		stage('Deploy from Private Registry') {
-			steps {
-				sh '''
-					echo "Checking containers using port 8081..."
-					OLD_CONTAINERS=$(docker ps -q --filter "publish=8081")
-					if [ -n "$OLD_CONTAINERS" ]; then
-					  echo "Removing containers using port 8081: $OLD_CONTAINERS"
-					  docker rm -f $OLD_CONTAINERS
-					else
-					  echo "No containers are using port 8081"
-					fi
+        stage('Deploy from Private Registry') {
+            steps {
+                sh '''
+                    echo "Checking containers using port 8081..."
+                    OLD_CONTAINERS=$(docker ps -q --filter "publish=8081")
+                    if [ -n "$OLD_CONTAINERS" ]; then
+                      echo "Removing containers using port 8081: $OLD_CONTAINERS"
+                      docker rm -f $OLD_CONTAINERS
+                    else
+                      echo "No containers are using port 8081"
+                    fi
 
-					docker rm -f sample-java-app-deploy || true
+                    docker rm -f ${CONTAINER_NAME} || true
 
-					docker run -d \
-					  --name sample-java-app-deploy \
-					  -p 8081:8080 \
-					  localhost:5000/sample-java-app:build-${BUILD_NUMBER}
-				'''
-			}
-		}
-		
-		stage('Verify Deployment') {
-			steps {
-				sh '''
-					sleep 10
-					curl -f http://host.docker.internal:8081/hello
-				'''
-			}
-		}
+                    docker run -d \
+                      --name ${CONTAINER_NAME} \
+                      -p 8081:8080 \
+                      ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
+                '''
+            }
+        }
 
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                    sleep 10
+                    curl -f http://host.docker.internal:8081/hello
+                '''
+            }
+        }
     }
-	
 
     post {
         always {
