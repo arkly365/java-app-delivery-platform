@@ -9,11 +9,12 @@ pipeline {
         )
     }
 
-    environment {
+	environment {
         IMAGE_NAME = 'arkly365/sample-java-app'
         IMAGE_TAG  = "build-${BUILD_NUMBER}-${params.TARGET_ENV}"
         PRIVATE_REGISTRY_IMAGE = "localhost:5000/sample-java-app"
         CONTAINER_NAME = "sample-java-app-${params.TARGET_ENV}"
+        APP_PORT = "${params.TARGET_ENV == 'prod' ? '8082' : '8081'}"
     }
 
     stages {
@@ -28,6 +29,7 @@ pipeline {
                 echo "TARGET_ENV = ${params.TARGET_ENV}"
                 echo "IMAGE_TAG  = ${env.IMAGE_TAG}"
                 echo "CONTAINER_NAME = ${env.CONTAINER_NAME}"
+				echo "APP_PORT = ${env.APP_PORT}"
             }
         }
 
@@ -127,47 +129,39 @@ pipeline {
             steps {
                 sh '''
                     docker tag sample-java-app:build-${BUILD_NUMBER} \
-                      ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
+                      ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_TAG}
 
                     docker tag sample-java-app:build-${BUILD_NUMBER} \
-                      ${PRIVATE_REGISTRY_IMAGE}:latest
+                      ${PRIVATE_REGISTRY_IMAGE}:${TARGET_ENV}-latest
 
-                    docker push ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
-                    docker push ${PRIVATE_REGISTRY_IMAGE}:latest
+                    docker push ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_TAG}
+                    docker push ${PRIVATE_REGISTRY_IMAGE}:${TARGET_ENV}-latest
                 '''
             }
         }
-
-        stage('Deploy from Private Registry') {
+		
+		stage('Deploy from Private Registry') {
             steps {
                 sh '''
-                    echo "Checking containers using port 8081..."
-                    OLD_CONTAINERS=$(docker ps -q --filter "publish=8081")
-                    if [ -n "$OLD_CONTAINERS" ]; then
-                      echo "Removing containers using port 8081: $OLD_CONTAINERS"
-                      docker rm -f $OLD_CONTAINERS
-                    else
-                      echo "No containers are using port 8081"
-                    fi
-
                     docker rm -f ${CONTAINER_NAME} || true
 
                     docker run -d \
                       --name ${CONTAINER_NAME} \
-                      -p 8081:8080 \
-                      ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
+                      -p ${APP_PORT}:8080 \
+                      ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_TAG}
                 '''
             }
         }
-
-        stage('Verify Deployment') {
+		
+		stage('Verify Deployment') {
             steps {
                 sh '''
                     sleep 10
-                    curl -f http://host.docker.internal:8081/hello
+                    curl -f http://host.docker.internal:${APP_PORT}/hello
                 '''
             }
         }
+		
     }
 
     post {
