@@ -1,20 +1,17 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(
-            name: 'TARGET_ENV',
-            choices: ['dev', 'prod'],
-            description: '選擇本次 build / deploy 的目標環境'
-        )
-    }
-
+	parameters {
+		choice(
+			name: 'TARGET_ENV',
+			choices: ['auto', 'dev', 'prod'],
+			description: 'auto=依 branch 自動判斷；也可手動指定 dev / prod'
+		)
+	}
+	
 	environment {
         IMAGE_NAME = 'arkly365/sample-java-app'
-        IMAGE_TAG  = "build-${BUILD_NUMBER}-${params.TARGET_ENV}"
-        PRIVATE_REGISTRY_IMAGE = "localhost:5000/sample-java-app"
-        CONTAINER_NAME = "sample-java-app-${params.TARGET_ENV}"
-        APP_PORT = "${params.TARGET_ENV == 'prod' ? '8082' : '8081'}"
+        PRIVATE_REGISTRY_IMAGE = 'localhost:5000/sample-java-app'
     }
 
     stages {
@@ -24,12 +21,54 @@ pipeline {
             }
         }
 		
+		stage('Detect Branch') {
+            steps {
+                script {
+                    def gitBranch = sh(
+                        script: 'git rev-parse --abbrev-ref HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    env.GIT_BRANCH_NAME = gitBranch
+
+                    def autoEnv = 'dev'
+                    if (gitBranch == 'main') {
+                        autoEnv = 'prod'
+                    } else if (gitBranch == 'develop') {
+                        autoEnv = 'dev'
+                    }
+
+                    env.AUTO_ENV = autoEnv
+
+                    if (params.TARGET_ENV == 'auto') {
+                        env.EFFECTIVE_ENV = env.AUTO_ENV
+                    } else {
+                        env.EFFECTIVE_ENV = params.TARGET_ENV
+                    }
+
+                    env.APP_PORT = (env.EFFECTIVE_ENV == 'prod') ? '8082' : '8081'
+                    env.CONTAINER_NAME = "sample-java-app-${env.EFFECTIVE_ENV}"
+                    env.IMAGE_TAG = "build-${env.BUILD_NUMBER}-${env.EFFECTIVE_ENV}"
+
+                    echo "GIT_BRANCH_NAME = ${env.GIT_BRANCH_NAME}"
+                    echo "AUTO_ENV = ${env.AUTO_ENV}"
+                    echo "EFFECTIVE_ENV = ${env.EFFECTIVE_ENV}"
+                    echo "APP_PORT = ${env.APP_PORT}"
+                    echo "CONTAINER_NAME = ${env.CONTAINER_NAME}"
+                    echo "IMAGE_TAG = ${env.IMAGE_TAG}"
+                }
+            }
+        }
+		
 		stage('Show Build Parameters') {
             steps {
                 echo "TARGET_ENV = ${params.TARGET_ENV}"
-                echo "IMAGE_TAG  = ${env.IMAGE_TAG}"
+                echo "GIT_BRANCH_NAME = ${env.GIT_BRANCH_NAME}"
+                echo "AUTO_ENV = ${env.AUTO_ENV}"
+                echo "EFFECTIVE_ENV = ${env.EFFECTIVE_ENV}"
+                echo "IMAGE_TAG = ${env.IMAGE_TAG}"
                 echo "CONTAINER_NAME = ${env.CONTAINER_NAME}"
-				echo "APP_PORT = ${env.APP_PORT}"
+                echo "APP_PORT = ${env.APP_PORT}"
             }
         }
 
