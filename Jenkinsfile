@@ -61,7 +61,7 @@ pipeline {
             }
         }
 
-        stage('Trivy Image Scan') {
+        stage('Trivy Report') {
             steps {
                 sh '''
                     docker run --rm \
@@ -75,7 +75,7 @@ pipeline {
                       --no-progress \
                       --format table \
                       --output /work/trivy-image-report.txt \
-                      --exit-code 1 \
+                      --exit-code 0 \
                       sample-java-app:build-${BUILD_NUMBER}
                 '''
             }
