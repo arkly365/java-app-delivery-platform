@@ -128,43 +128,61 @@ pipeline {
             }
         }
 
-        stage('Trivy Report') {
-            steps {
-                sh '''
-                    docker run --rm \
-                      -v trivy_cache:/root/.cache/ \
-                      -v "$WORKSPACE:/work" \
-                      aquasec/trivy:0.62.0 image \
-                      --input /work/sample-java-app-build-${BUILD_NUMBER}.tar \
-                      --scanners vuln \
-                      --severity HIGH,CRITICAL \
-                      --ignore-unfixed \
-                      --no-progress \
-                      --format table \
-                      --output /work/trivy-image-report.txt \
-                      --exit-code 0
-                '''
-                sh 'ls -la'
-                sh 'test -f trivy-image-report.txt'
-            }
-        }
+		stage('Trivy Report') {
+			steps {
+				sh '''
+					docker rm -f trivy-tmp-report || true
+
+					docker run -d --name trivy-tmp-report \
+					  --entrypoint sh \
+					  -v trivy_cache:/root/.cache/ \
+					  aquasec/trivy:0.62.0 \
+					  -c "sleep 300"
+
+					docker cp sample-java-app-build-${BUILD_NUMBER}.tar \
+					  trivy-tmp-report:/tmp/sample-java-app-build-${BUILD_NUMBER}.tar
+
+					docker exec trivy-tmp-report trivy image \
+					  --input /tmp/sample-java-app-build-${BUILD_NUMBER}.tar \
+					  --scanners vuln \
+					  --severity HIGH,CRITICAL \
+					  --ignore-unfixed \
+					  --no-progress \
+					  --format table \
+					  > trivy-image-report.txt
+
+					test -f trivy-image-report.txt
+					docker rm -f trivy-tmp-report
+				'''
+			}
+		}
 
         stage('Trivy Security Gate') {
-            steps {
-                sh '''
-                    docker run --rm \
-                      -v trivy_cache:/root/.cache/ \
-                      -v "$WORKSPACE:/work" \
-                      aquasec/trivy:0.62.0 image \
-                      --input /work/sample-java-app-build-${BUILD_NUMBER}.tar \
-                      --scanners vuln \
-                      --severity HIGH,CRITICAL \
-                      --ignore-unfixed \
-                      --no-progress \
-                      --exit-code 1
-                '''
-            }
-        }
+			steps {
+				sh '''
+					docker rm -f trivy-tmp-gate || true
+
+					docker run -d --name trivy-tmp-gate \
+					  --entrypoint sh \
+					  -v trivy_cache:/root/.cache/ \
+					  aquasec/trivy:0.62.0 \
+					  -c "sleep 300"
+
+					docker cp sample-java-app-build-${BUILD_NUMBER}.tar \
+					  trivy-tmp-gate:/tmp/sample-java-app-build-${BUILD_NUMBER}.tar
+
+					docker exec trivy-tmp-gate trivy image \
+					  --input /tmp/sample-java-app-build-${BUILD_NUMBER}.tar \
+					  --scanners vuln \
+					  --severity HIGH,CRITICAL \
+					  --ignore-unfixed \
+					  --no-progress \
+					  --exit-code 1
+
+					docker rm -f trivy-tmp-gate
+				'''
+			}
+		}
 
         stage('Docker Hub Login') {
             steps {
