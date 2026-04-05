@@ -21,20 +21,16 @@ pipeline {
             }
         }
 
-        stage('Detect Branch') {
+		stage('Detect Branch') {
             steps {
                 script {
-                    def gitBranch = sh(
-                        script: 'git rev-parse --abbrev-ref HEAD',
-                        returnStdout: true
-                    ).trim()
-
-                    env.GIT_BRANCH_NAME = gitBranch
+                    def branchName = env.BRANCH_NAME ?: 'unknown'
+                    env.GIT_BRANCH_NAME = branchName
 
                     def autoEnv = 'dev'
-                    if (gitBranch == 'main' || gitBranch == 'master') {
+                    if (branchName == 'main' || branchName == 'master') {
                         autoEnv = 'prod'
-                    } else if (gitBranch == 'develop' || gitBranch == 'develop') {
+                    } else if (branchName == 'develop') {
                         autoEnv = 'dev'
                     }
 
@@ -49,13 +45,16 @@ pipeline {
                     env.APP_PORT = (env.EFFECTIVE_ENV == 'prod') ? '8082' : '8081'
                     env.CONTAINER_NAME = "sample-java-app-${env.EFFECTIVE_ENV}"
                     env.IMAGE_TAG = "build-${env.BUILD_NUMBER}-${env.EFFECTIVE_ENV}"
+                    env.IMAGE_LATEST_TAG = "${env.EFFECTIVE_ENV}-latest"
 
+                    echo "BRANCH_NAME = ${env.BRANCH_NAME}"
                     echo "GIT_BRANCH_NAME = ${env.GIT_BRANCH_NAME}"
                     echo "AUTO_ENV = ${env.AUTO_ENV}"
                     echo "EFFECTIVE_ENV = ${env.EFFECTIVE_ENV}"
                     echo "APP_PORT = ${env.APP_PORT}"
                     echo "CONTAINER_NAME = ${env.CONTAINER_NAME}"
                     echo "IMAGE_TAG = ${env.IMAGE_TAG}"
+                    echo "IMAGE_LATEST_TAG = ${env.IMAGE_LATEST_TAG}"
                 }
             }
         }
@@ -63,10 +62,12 @@ pipeline {
         stage('Show Build Parameters') {
             steps {
                 echo "TARGET_ENV = ${params.TARGET_ENV}"
+                echo "BRANCH_NAME = ${env.BRANCH_NAME}"
                 echo "GIT_BRANCH_NAME = ${env.GIT_BRANCH_NAME}"
                 echo "AUTO_ENV = ${env.AUTO_ENV}"
                 echo "EFFECTIVE_ENV = ${env.EFFECTIVE_ENV}"
                 echo "IMAGE_TAG = ${env.IMAGE_TAG}"
+                echo "IMAGE_LATEST_TAG = ${env.IMAGE_LATEST_TAG}"
                 echo "CONTAINER_NAME = ${env.CONTAINER_NAME}"
                 echo "APP_PORT = ${env.APP_PORT}"
             }
@@ -196,10 +197,10 @@ pipeline {
             }
         }
 
-        stage('Docker Hub Tag') {
+		stage('Docker Hub Tag') {
             steps {
                 sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:${IMAGE_TAG}'
-                sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:${EFFECTIVE_ENV}-latest'
+                sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:${IMAGE_LATEST_TAG}'
             }
         }
 
@@ -210,17 +211,17 @@ pipeline {
             }
         }
 
-        stage('Push to Private Registry') {
+		stage('Push to Private Registry') {
             steps {
                 sh '''
                     docker tag sample-java-app:build-${BUILD_NUMBER} \
                       ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_TAG}
 
                     docker tag sample-java-app:build-${BUILD_NUMBER} \
-                      ${PRIVATE_REGISTRY_IMAGE}:${EFFECTIVE_ENV}-latest
+                      ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_LATEST_TAG}
 
                     docker push ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_TAG}
-                    docker push ${PRIVATE_REGISTRY_IMAGE}:${EFFECTIVE_ENV}-latest
+                    docker push ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_LATEST_TAG}
                 '''
             }
         }
