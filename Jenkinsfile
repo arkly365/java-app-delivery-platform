@@ -1,15 +1,15 @@
 pipeline {
     agent any
 
-	parameters {
-		choice(
-			name: 'TARGET_ENV',
-			choices: ['auto', 'dev', 'prod'],
-			description: 'auto=依 branch 自動判斷；也可手動指定 dev / prod'
-		)
-	}
-	
-	environment {
+    parameters {
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['auto', 'dev', 'prod'],
+            description: 'auto=依 branch 自動判斷；也可手動指定 dev / prod'
+        )
+    }
+
+    environment {
         IMAGE_NAME = 'arkly365/sample-java-app'
         PRIVATE_REGISTRY_IMAGE = 'localhost:5000/sample-java-app'
     }
@@ -20,8 +20,8 @@ pipeline {
                 echo 'Pipeline from SCM started'
             }
         }
-		
-		stage('Detect Branch') {
+
+        stage('Detect Branch') {
             steps {
                 script {
                     def gitBranch = sh(
@@ -34,7 +34,7 @@ pipeline {
                     def autoEnv = 'dev'
                     if (gitBranch == 'main' || gitBranch == 'master') {
                         autoEnv = 'prod'
-                    } else if (gitBranch == 'develop') {
+                    } else if (gitBranch == 'develop' || gitBranch == 'develop') {
                         autoEnv = 'dev'
                     }
 
@@ -59,8 +59,8 @@ pipeline {
                 }
             }
         }
-		
-		stage('Show Build Parameters') {
+
+        stage('Show Build Parameters') {
             steps {
                 echo "TARGET_ENV = ${params.TARGET_ENV}"
                 echo "GIT_BRANCH_NAME = ${env.GIT_BRANCH_NAME}"
@@ -100,7 +100,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -118,22 +118,50 @@ pipeline {
             }
         }
 
+        stage('Docker Save') {
+            steps {
+                sh '''
+                    docker save sample-java-app:build-${BUILD_NUMBER} \
+                      -o sample-java-app-build-${BUILD_NUMBER}.tar
+                '''
+                sh 'ls -lh sample-java-app-build-${BUILD_NUMBER}.tar'
+            }
+        }
+
         stage('Trivy Report') {
             steps {
                 sh '''
                     docker run --rm \
-                      -v /var/run/docker.sock:/var/run/docker.sock \
                       -v trivy_cache:/root/.cache/ \
                       -v "$WORKSPACE:/work" \
                       aquasec/trivy:0.62.0 image \
+                      --input /work/sample-java-app-build-${BUILD_NUMBER}.tar \
                       --scanners vuln \
                       --severity HIGH,CRITICAL \
                       --ignore-unfixed \
                       --no-progress \
                       --format table \
                       --output /work/trivy-image-report.txt \
-                      --exit-code 0 \
-                      sample-java-app:build-${BUILD_NUMBER}
+                      --exit-code 0
+                '''
+                sh 'ls -la'
+                sh 'test -f trivy-image-report.txt'
+            }
+        }
+
+        stage('Trivy Security Gate') {
+            steps {
+                sh '''
+                    docker run --rm \
+                      -v trivy_cache:/root/.cache/ \
+                      -v "$WORKSPACE:/work" \
+                      aquasec/trivy:0.62.0 image \
+                      --input /work/sample-java-app-build-${BUILD_NUMBER}.tar \
+                      --scanners vuln \
+                      --severity HIGH,CRITICAL \
+                      --ignore-unfixed \
+                      --no-progress \
+                      --exit-code 1
                 '''
             }
         }
@@ -153,14 +181,14 @@ pipeline {
         stage('Docker Hub Tag') {
             steps {
                 sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:${IMAGE_TAG}'
-                sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:latest'
+                sh 'docker tag sample-java-app:build-${BUILD_NUMBER} ${IMAGE_NAME}:${EFFECTIVE_ENV}-latest'
             }
         }
 
         stage('Docker Hub Push') {
             steps {
                 sh 'docker push ${IMAGE_NAME}:${IMAGE_TAG}'
-                sh 'docker push ${IMAGE_NAME}:latest'
+                sh 'docker push ${IMAGE_NAME}:${EFFECTIVE_ENV}-latest'
             }
         }
 
@@ -171,15 +199,15 @@ pipeline {
                       ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_TAG}
 
                     docker tag sample-java-app:build-${BUILD_NUMBER} \
-                      ${PRIVATE_REGISTRY_IMAGE}:${TARGET_ENV}-latest
+                      ${PRIVATE_REGISTRY_IMAGE}:${EFFECTIVE_ENV}-latest
 
                     docker push ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_TAG}
-                    docker push ${PRIVATE_REGISTRY_IMAGE}:${TARGET_ENV}-latest
+                    docker push ${PRIVATE_REGISTRY_IMAGE}:${EFFECTIVE_ENV}-latest
                 '''
             }
         }
-		
-		stage('Deploy from Private Registry') {
+
+        stage('Deploy from Private Registry') {
             steps {
                 sh '''
                     docker rm -f ${CONTAINER_NAME} || true
@@ -191,8 +219,8 @@ pipeline {
                 '''
             }
         }
-		
-		stage('Verify Deployment') {
+
+        stage('Verify Deployment') {
             steps {
                 sh '''
                     sleep 10
@@ -200,7 +228,6 @@ pipeline {
                 '''
             }
         }
-		
     }
 
     post {
