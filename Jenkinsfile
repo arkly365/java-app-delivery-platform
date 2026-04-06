@@ -46,6 +46,9 @@ pipeline {
                     env.CONTAINER_NAME = "sample-java-app-${env.EFFECTIVE_ENV}"
                     env.IMAGE_TAG = "build-${env.BUILD_NUMBER}-${env.EFFECTIVE_ENV}"
                     env.IMAGE_LATEST_TAG = "${env.EFFECTIVE_ENV}-latest"
+					env.SAFE_BRANCH_NAME = (env.BRANCH_NAME ?: 'unknown').replaceAll('[^A-Za-z0-9_.-]', '-')
+					env.TRIVY_REPORT_CONTAINER = "trivy-report-${env.SAFE_BRANCH_NAME}-${env.BUILD_NUMBER}"
+					env.TRIVY_GATE_CONTAINER = "trivy-gate-${env.SAFE_BRANCH_NAME}-${env.BUILD_NUMBER}"
 
                     echo "BRANCH_NAME = ${env.BRANCH_NAME}"
                     echo "GIT_BRANCH_NAME = ${env.GIT_BRANCH_NAME}"
@@ -55,6 +58,9 @@ pipeline {
                     echo "CONTAINER_NAME = ${env.CONTAINER_NAME}"
                     echo "IMAGE_TAG = ${env.IMAGE_TAG}"
                     echo "IMAGE_LATEST_TAG = ${env.IMAGE_LATEST_TAG}"
+					echo "SAFE_BRANCH_NAME = ${env.SAFE_BRANCH_NAME}"
+					echo "TRIVY_REPORT_CONTAINER = ${env.TRIVY_REPORT_CONTAINER}"
+					echo "TRIVY_GATE_CONTAINER = ${env.TRIVY_GATE_CONTAINER}"
                 }
             }
         }
@@ -132,18 +138,18 @@ pipeline {
 		stage('Trivy Report') {
 			steps {
 				sh '''
-					docker rm -f trivy-tmp-report || true
+					docker rm -f ${TRIVY_REPORT_CONTAINER} || true
 
-					docker run -d --name trivy-tmp-report \
+					docker run -d --name ${TRIVY_REPORT_CONTAINER} \
 					  --entrypoint sh \
 					  -v trivy_cache:/root/.cache/ \
 					  aquasec/trivy:0.62.0 \
 					  -c "sleep 300"
 
 					docker cp sample-java-app-build-${BUILD_NUMBER}.tar \
-					  trivy-tmp-report:/tmp/sample-java-app-build-${BUILD_NUMBER}.tar
+					  ${TRIVY_REPORT_CONTAINER}:/tmp/sample-java-app-build-${BUILD_NUMBER}.tar
 
-					docker exec trivy-tmp-report trivy image \
+					docker exec ${TRIVY_REPORT_CONTAINER} trivy image \
 					  --input /tmp/sample-java-app-build-${BUILD_NUMBER}.tar \
 					  --scanners vuln \
 					  --severity HIGH,CRITICAL \
@@ -153,7 +159,7 @@ pipeline {
 					  > trivy-image-report.txt
 
 					test -f trivy-image-report.txt
-					docker rm -f trivy-tmp-report
+					docker rm -f ${TRIVY_REPORT_CONTAINER} || true
 				'''
 			}
 		}
@@ -161,18 +167,18 @@ pipeline {
 		stage('Trivy Security Gate') {
 			steps {
 				sh '''
-					docker rm -f trivy-tmp-gate || true
+					docker rm -f ${TRIVY_GATE_CONTAINER} || true
 
-					docker run -d --name trivy-tmp-gate \
+					docker run -d --name ${TRIVY_GATE_CONTAINER} \
 					  --entrypoint sh \
 					  -v trivy_cache:/root/.cache/ \
 					  aquasec/trivy:0.62.0 \
 					  -c "sleep 300"
 
 					docker cp sample-java-app-build-${BUILD_NUMBER}.tar \
-					  trivy-tmp-gate:/tmp/sample-java-app-build-${BUILD_NUMBER}.tar
+					  ${TRIVY_GATE_CONTAINER}:/tmp/sample-java-app-build-${BUILD_NUMBER}.tar
 
-					docker exec trivy-tmp-gate trivy image \
+					docker exec ${TRIVY_GATE_CONTAINER} trivy image \
 					  --input /tmp/sample-java-app-build-${BUILD_NUMBER}.tar \
 					  --scanners vuln \
 					  --severity HIGH,CRITICAL \
@@ -180,7 +186,7 @@ pipeline {
 					  --no-progress \
 					  --exit-code 0
 
-					docker rm -f trivy-tmp-gate
+					docker rm -f ${TRIVY_GATE_CONTAINER} || true
 				'''
 			}
 		}
