@@ -13,10 +13,10 @@ pipeline {
     stages {
         stage('Init') {
             steps {
-                echo 'Pipeline started'
-                echo "Branch = ${env.BRANCH_NAME}"
-                echo "ROLLBACK_TAG = ${params.ROLLBACK_TAG}"
-            }
+				echo 'Pipeline started'
+				echo "Branch = ${env.BRANCH_NAME}"
+				echo "ROLLBACK_TAG = ${params.ROLLBACK_TAG}"
+			}
         }
 
         stage('Check Tools') {
@@ -112,40 +112,41 @@ pipeline {
             }
         }
 
-        stage('Deploy with docker-compose') {
-            steps {
-                script {
-                    def deployTag = ''
-                    def composeFile = ''
-                    def verifyUrl = ''
+        stage('Deploy with Docker Compose') {
+			steps {
+				script {
+					def deployTag = ''
+					def composeFile = ''
+					def verifyUrl = ''
 
-                    if (params.ROLLBACK_TAG?.trim()) {
-                        deployTag = params.ROLLBACK_TAG.trim()
-                    } else {
-                        deployTag = (env.BRANCH_NAME == 'master') ? 'master-latest' : 'develop-latest'
-                    }
+					if (params.ROLLBACK_TAG?.trim()) {
+						deployTag = params.ROLLBACK_TAG.trim()
+					} else {
+						deployTag = (env.BRANCH_NAME == 'master') ? 'master-latest' : 'develop-latest'
+					}
 
-                    if (env.BRANCH_NAME == 'master') {
-                        composeFile = 'deploy/docker-compose.prod.yml'
-                        verifyUrl = 'http://host.docker.internal:8082/hello'
-                    } else if (env.BRANCH_NAME == 'develop') {
-                        composeFile = 'deploy/docker-compose.dev.yml'
-                        verifyUrl = 'http://host.docker.internal:8081/hello'
-                    } else {
-                        echo "Skip deploy for branch: ${env.BRANCH_NAME}"
-                        return
-                    }
+					if (env.BRANCH_NAME == 'master') {
+						composeFile = 'deploy/docker-compose.prod.yml'
+						verifyUrl = 'http://host.docker.internal:8082/hello'
+					} else if (env.BRANCH_NAME == 'develop') {
+						composeFile = 'deploy/docker-compose.dev.yml'
+						verifyUrl = 'http://host.docker.internal:8081/hello'
+					} else {
+						echo "Skip deploy for branch: ${env.BRANCH_NAME}"
+						return
+					}
 
-                    echo "Deploy tag = ${deployTag}"
-                    echo "Compose file = ${composeFile}"
-                    echo "Verify URL = ${verifyUrl}"
+					echo "Deploy tag = ${deployTag}"
+					echo "Compose file = ${composeFile}"
+					echo "Verify URL = ${verifyUrl}"
 
-                    sh """
-                        IMAGE_TAG=${deployTag} docker-compose -f ${composeFile} up -d --remove-orphans
-                    """
-                }
-            }
-        }
+					sh """
+						export IMAGE_TAG='${deployTag}'
+						docker-compose -f ${composeFile} up -d --remove-orphans
+					"""
+				}
+			}
+		}
 
         stage('Verify Deployment') {
             steps {
