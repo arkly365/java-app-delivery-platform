@@ -251,9 +251,9 @@ pipeline {
         }
     }
 
-    post {
-        always {
-            archiveArtifacts artifacts: 'trivy-image-report.txt', fingerprint: true
-        }
-    }
+	post {
+		always {
+			archiveArtifacts artifacts: 'trivy-image-report.txt', fingerprint: true, allowEmptyArchive: true
+		}
+	}
 }
