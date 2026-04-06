@@ -1,19 +1,14 @@
 pipeline {
     agent any
 
-    parameters {
-		string(name: 'ROLLBACK_TAG', defaultValue: '', description: 'Optional rollback tag, e.g. build-8'),
-        choice(
-            name: 'TARGET_ENV',
-            choices: ['auto', 'dev', 'prod'],
-            description: 'auto=依 branch 自動判斷；也可手動指定 dev / prod'
-        )
+	parameters {
+        string(name: 'ROLLBACK_TAG', defaultValue: '', description: 'Optional rollback tag, e.g. build-8')
     }
 
     environment {
         IMAGE_NAME = 'arkly365/sample-java-app'
-        PRIVATE_REGISTRY_IMAGE = 'localhost:5000/sample-java-app'
-		IMAGE_TAG  = "build-${BUILD_NUMBER}"
+        IMAGE_TAG  = "build-${BUILD_NUMBER}"
+        PRIVATE_REGISTRY_IMAGE = "localhost:5000/sample-java-app"
     }
 
     stages {
