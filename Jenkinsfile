@@ -185,6 +185,7 @@ pipeline {
 			}
 		}
 
+		/*
         stage('Docker Hub Login') {
             steps {
                 withCredentials([usernamePassword(
@@ -210,6 +211,7 @@ pipeline {
                 sh 'docker push ${IMAGE_NAME}:${EFFECTIVE_ENV}-latest'
             }
         }
+		*/
 
 		stage('Push to Private Registry') {
             steps {
