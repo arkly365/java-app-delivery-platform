@@ -1,0 +1,10 @@
+services:
+  sample-java-app-prod:
+    image: localhost:5000/sample-java-app:${IMAGE_TAG}
+    container_name: sample-java-app-prod
+    ports:
+      - "8082:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      APP_ENV: prod
+    restart: unless-stopped

@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     parameters {
+		string(name: 'ROLLBACK_TAG', defaultValue: '', description: 'Optional rollback tag, e.g. build-8'),
         choice(
             name: 'TARGET_ENV',
             choices: ['auto', 'dev', 'prod'],
@@ -12,6 +13,7 @@ pipeline {
     environment {
         IMAGE_NAME = 'arkly365/sample-java-app'
         PRIVATE_REGISTRY_IMAGE = 'localhost:5000/sample-java-app'
+		IMAGE_TAG  = "build-${BUILD_NUMBER}"
     }
 
     stages {
@@ -218,22 +220,25 @@ pipeline {
             }
         }
 		*/
-
+		
 		stage('Push to Private Registry') {
-            steps {
-                sh '''
-                    docker tag sample-java-app:build-${BUILD_NUMBER} \
-                      ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_TAG}
+			steps {
+				script {
+					def stableTag = (env.BRANCH_NAME == 'master') ? 'master-latest' : 'develop-latest'
 
-                    docker tag sample-java-app:build-${BUILD_NUMBER} \
-                      ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_LATEST_TAG}
+					sh """
+						docker tag sample-java-app:build-${BUILD_NUMBER} ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
+						docker tag sample-java-app:build-${BUILD_NUMBER} ${PRIVATE_REGISTRY_IMAGE}:${stableTag}
 
-                    docker push ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_TAG}
-                    docker push ${PRIVATE_REGISTRY_IMAGE}:${IMAGE_LATEST_TAG}
-                '''
-            }
-        }
+						docker push ${PRIVATE_REGISTRY_IMAGE}:build-${BUILD_NUMBER}
+						docker push ${PRIVATE_REGISTRY_IMAGE}:${stableTag}
+					"""
+				}
+			}
+		}
+		
 
+		/*
         stage('Deploy from Private Registry') {
             steps {
                 sh '''
@@ -246,15 +251,58 @@ pipeline {
                 '''
             }
         }
+		*/
 
-        stage('Verify Deployment') {
-            steps {
-                sh '''
-                    sleep 10
-                    curl -f http://host.docker.internal:${APP_PORT}/hello
-                '''
-            }
-        }
+		stage('Deploy with Docker Compose') {
+			steps {
+				script {
+					def deployTag = ''
+					if (params.ROLLBACK_TAG?.trim()) {
+						deployTag = params.ROLLBACK_TAG.trim()
+					} else {
+						deployTag = (env.BRANCH_NAME == 'master') ? 'master-latest' : 'develop-latest'
+					}
+
+					echo "Deploy tag = ${deployTag}"
+
+					if (env.BRANCH_NAME == 'master') {
+						sh """
+							export IMAGE_TAG=${deployTag}
+							docker compose -f deploy/docker-compose.prod.yml up -d
+						"""
+					} else if (env.BRANCH_NAME == 'develop') {
+						sh """
+							export IMAGE_TAG=${deployTag}
+							docker compose -f deploy/docker-compose.dev.yml up -d
+						"""
+					} else {
+						echo "Skip deployment for branch: ${env.BRANCH_NAME}"
+					}
+				}
+			}
+		}
+		
+		
+		stage('Verify Deployment') {
+			steps {
+				script {
+					if (env.BRANCH_NAME == 'master') {
+						sh '''
+							sleep 10
+							curl -f http://host.docker.internal:8082/hello
+						'''
+					} else if (env.BRANCH_NAME == 'develop') {
+						sh '''
+							sleep 10
+							curl -f http://host.docker.internal:8081/hello
+						'''
+					} else {
+						echo "Skip verify for branch: ${env.BRANCH_NAME}"
+					}
+				}
+			}
+		}
+		
     }
 
 	post {

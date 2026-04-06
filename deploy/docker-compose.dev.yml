@@ -1,0 +1,10 @@
+services:
+  sample-java-app-dev:
+    image: localhost:5000/sample-java-app:${IMAGE_TAG}
+    container_name: sample-java-app-dev
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      APP_ENV: dev
+    restart: unless-stopped
