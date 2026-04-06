@@ -24,7 +24,7 @@ pipeline {
                 sh 'git --version'
                 sh 'mvn -version'
                 sh 'docker --version'
-                sh 'docker compose version'
+                sh 'docker-compose version'
             }
         }
 
@@ -112,7 +112,7 @@ pipeline {
             }
         }
 
-        stage('Deploy with Docker Compose') {
+        stage('Deploy with docker-compose') {
             steps {
                 script {
                     def deployTag = ''
@@ -141,7 +141,7 @@ pipeline {
                     echo "Verify URL = ${verifyUrl}"
 
                     sh """
-                        IMAGE_TAG=${deployTag} docker compose -f ${composeFile} up -d --remove-orphans
+                        IMAGE_TAG=${deployTag} docker-compose -f ${composeFile} up -d --remove-orphans
                     """
                 }
             }
