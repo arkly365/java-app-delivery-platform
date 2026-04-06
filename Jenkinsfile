@@ -11,13 +11,14 @@ pipeline {
     }
 
     stages {
-        stage('Init') {
-            steps {
+	
+		stage('Init') {
+			steps {
 				echo 'Pipeline started'
 				echo "Branch = ${env.BRANCH_NAME}"
 				echo "ROLLBACK_TAG = ${params.ROLLBACK_TAG}"
 			}
-        }
+		}
 
         stage('Check Tools') {
             steps {
@@ -112,12 +113,12 @@ pipeline {
             }
         }
 
-        stage('Deploy with Docker Compose') {
+		stage('Deploy with Docker Compose') {
 			steps {
 				script {
-					def deployTag = ''
-					def composeFile = ''
-					def verifyUrl = ''
+					def deployTag
+					def composeFile
+					def verifyUrl
 
 					if (params.ROLLBACK_TAG?.trim()) {
 						deployTag = params.ROLLBACK_TAG.trim()
