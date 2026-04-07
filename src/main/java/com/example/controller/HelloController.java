@@ -26,6 +26,7 @@ public class HelloController {
         result.put("environment", environment);
         result.put("branch", branch);
         result.put("imageTag", imageTag);
+        
         return result;
     }
 
