@@ -188,10 +188,10 @@ pipeline {
 					def reportPrefix = ''
 
 					if (env.BRANCH_NAME == 'master') {
-						targetUrl = 'http://host.docker.internal:8082'
+						targetUrl = 'http://host.docker.internal:8082/hello'
 						reportPrefix = 'zap-report-prod'
 					} else if (env.BRANCH_NAME == 'develop') {
-						targetUrl = 'http://host.docker.internal:8081'
+						targetUrl = 'http://host.docker.internal:8081/hello'
 						reportPrefix = 'zap-report-dev'
 					} else {
 						echo "Skip ZAP scan for branch: ${env.BRANCH_NAME}"
@@ -206,12 +206,13 @@ pipeline {
 						  -v "$WORKSPACE:/zap/wrk" \
 						  ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
 						  -t ${targetUrl} \
-						  -r /zap/wrk/${reportPrefix}.html \
-						  -J /zap/wrk/${reportPrefix}.json \
+						  -m 1 \
+						  -r ${reportPrefix}.html \
+						  -J ${reportPrefix}.json \
 						  || true
 					"""
 
-					sh 'ls -la /var/jenkins_home/workspace/delivery-platform-github_${BRANCH_NAME} || true'
+					sh 'ls -la'
 					sh 'ls -la zap-report-*.html zap-report-*.json || true'
 				}
 			}
