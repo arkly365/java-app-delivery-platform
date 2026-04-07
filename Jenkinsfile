@@ -143,31 +143,35 @@ pipeline {
 
 					sh """
 						export IMAGE_TAG='${deployTag}'
+						export APP_BRANCH='${env.BRANCH_NAME}'
 						docker-compose -f ${composeFile} up -d --remove-orphans
 					"""
 				}
 			}
 		}
 
-        stage('Verify Deployment') {
-            steps {
-                script {
-                    if (env.BRANCH_NAME == 'master') {
-                        sh '''
-                            sleep 10
-                            curl -f http://host.docker.internal:8082/hello
-                        '''
-                    } else if (env.BRANCH_NAME == 'develop') {
-                        sh '''
-                            sleep 10
-                            curl -f http://host.docker.internal:8081/hello
-                        '''
-                    } else {
-                        echo "Skip verify for branch: ${env.BRANCH_NAME}"
-                    }
-                }
-            }
-        }
+		stage('Verify Deployment') {
+		    steps {
+		        script {
+		            if (env.BRANCH_NAME == 'master') {
+		                sh '''
+		                    sleep 10
+		                    curl -f http://host.docker.internal:8082/hello
+		                    curl -f http://host.docker.internal:8082/version
+		                '''
+		            } else if (env.BRANCH_NAME == 'develop') {
+		                sh '''
+		                    sleep 10
+		                    curl -f http://host.docker.internal:8081/hello
+		                    curl -f http://host.docker.internal:8081/version
+		                '''
+		            } else {
+		                echo "Skip verify for branch: ${env.BRANCH_NAME}"
+		            }
+		        }
+		    }
+		}                
+        
     }
 
     post {

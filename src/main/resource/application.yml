@@ -1,0 +1,4 @@
+app:
+  environment: ${APP_ENV:local}
+  branch: ${APP_BRANCH:unknown}
+  imageTag: ${APP_IMAGE_TAG:unknown}
