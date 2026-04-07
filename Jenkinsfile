@@ -151,26 +151,35 @@ pipeline {
 		}
 
 		stage('Verify Deployment') {
-		    steps {
-		        script {
-		            if (env.BRANCH_NAME == 'master') {
-		                sh '''
-		                    sleep 10
-		                    curl -f http://host.docker.internal:8082/hello
-		                    curl -f http://host.docker.internal:8082/version
-		                '''
-		            } else if (env.BRANCH_NAME == 'develop') {
-		                sh '''
-		                    sleep 10
-		                    curl -f http://host.docker.internal:8081/hello
-		                    curl -f http://host.docker.internal:8081/version
-		                '''
-		            } else {
-		                echo "Skip verify for branch: ${env.BRANCH_NAME}"
-		            }
-		        }
-		    }
-		}    
+			steps {
+				script {
+					if (env.BRANCH_NAME == 'master') {
+						sh '''
+							for i in 1 2 3 4 5; do
+							  echo "Verify attempt $i"
+							  curl -f http://host.docker.internal:8082/hello && \
+							  curl -f http://host.docker.internal:8082/version && exit 0
+							  sleep 5
+							done
+							exit 1
+						'''
+					} else if (env.BRANCH_NAME == 'develop') {
+						sh '''
+							for i in 1 2 3 4 5; do
+							  echo "Verify attempt $i"
+							  curl -f http://host.docker.internal:8081/hello && \
+							  curl -f http://host.docker.internal:8081/version && exit 0
+							  sleep 5
+							done
+							exit 1
+						'''
+					} else {
+						echo "Skip verify for branch: ${env.BRANCH_NAME}"
+					}
+				}
+			}
+		}
+
 
 		stage('OWASP ZAP Baseline Scan') {
 			steps {
