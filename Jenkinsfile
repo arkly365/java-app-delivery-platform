@@ -170,13 +170,45 @@ pipeline {
 		            }
 		        }
 		    }
-		}                
+		}    
+
+		stage('OWASP ZAP Baseline Scan') {
+			steps {
+				script {
+					def targetUrl = ''
+					def reportPrefix = ''
+
+					if (env.BRANCH_NAME == 'master') {
+						targetUrl = 'http://host.docker.internal:8082'
+						reportPrefix = 'zap-report-prod'
+					} else if (env.BRANCH_NAME == 'develop') {
+						targetUrl = 'http://host.docker.internal:8081'
+						reportPrefix = 'zap-report-dev'
+					} else {
+						echo "Skip ZAP scan for branch: ${env.BRANCH_NAME}"
+						return
+					}
+
+					echo "ZAP target = ${targetUrl}"
+
+					sh """
+						docker run --rm \
+						  -v "$WORKSPACE:/zap/wrk" \
+						  ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+						  -t ${targetUrl} \
+						  -r ${reportPrefix}.html \
+						  -J ${reportPrefix}.json \
+						  || true
+					"""
+				}
+			}
+		}
         
     }
 
     post {
         always {
-            archiveArtifacts artifacts: 'trivy-image-report.txt', fingerprint: true, allowEmptyArchive: true
+			archiveArtifacts artifacts: 'trivy-image-report.txt, zap-report-*.html, zap-report-*.json', fingerprint: true, allowEmptyArchive: true
         }
     }
 }
