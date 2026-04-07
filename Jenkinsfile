@@ -207,6 +207,7 @@ pipeline {
 						  -t ${targetUrl} \
 						  -r ${reportPrefix}.html \
 						  -J ${reportPrefix}.json \
+						  -d \
 						  || true
 					"""
 				}
