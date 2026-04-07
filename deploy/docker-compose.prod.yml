@@ -5,6 +5,7 @@ services:
     ports:
       - "8082:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: prod
       APP_ENV: prod
+      APP_BRANCH: ${APP_BRANCH}
+      APP_IMAGE_TAG: ${IMAGE_TAG}
     restart: unless-stopped
