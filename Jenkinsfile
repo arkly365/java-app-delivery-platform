@@ -185,14 +185,14 @@ pipeline {
 			steps {
 				script {
 					def targetUrl = ''
-					def reportPrefix = ''
+					def reportFile = ''
 
 					if (env.BRANCH_NAME == 'master') {
 						targetUrl = 'http://host.docker.internal:8082/hello'
-						reportPrefix = 'zap-report-prod'
+						reportFile = 'zap-baseline-prod.txt'
 					} else if (env.BRANCH_NAME == 'develop') {
 						targetUrl = 'http://host.docker.internal:8081/hello'
-						reportPrefix = 'zap-report-dev'
+						reportFile = 'zap-baseline-dev.txt'
 					} else {
 						echo "Skip ZAP scan for branch: ${env.BRANCH_NAME}"
 						return
@@ -207,13 +207,11 @@ pipeline {
 						  ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
 						  -t ${targetUrl} \
 						  -m 1 \
-						  -r ${reportPrefix}.html \
-						  -J ${reportPrefix}.json \
-						  || true
+						  2>&1 | tee ${reportFile} || true
 					"""
 
 					sh 'ls -la'
-					sh 'ls -la zap-report-*.html zap-report-*.json || true'
+					sh 'test -f ${reportFile}'
 				}
 			}
 		}
@@ -223,7 +221,8 @@ pipeline {
 
     post {
         always {
-			archiveArtifacts artifacts: 'trivy-image-report.txt, zap-report-*.html, zap-report-*.json', fingerprint: true, allowEmptyArchive: true
+			archiveArtifacts artifacts: 'trivy-image-report.txt, zap-baseline-*.txt', fingerprint: true, allowEmptyArchive: true
 		}
+		
     }
 }
