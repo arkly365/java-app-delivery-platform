@@ -180,7 +180,7 @@ pipeline {
 			}
 		}
 
-
+		
 		stage('OWASP ZAP Baseline Scan') {
 			steps {
 				script {
@@ -206,16 +206,17 @@ pipeline {
 						  -v "$WORKSPACE:/zap/wrk" \
 						  ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
 						  -t ${targetUrl} \
-						  -r ${reportPrefix}.html \
-						  -J ${reportPrefix}.json \
+						  -r /zap/wrk/${reportPrefix}.html \
+						  -J /zap/wrk/${reportPrefix}.json \
 						  || true
 					"""
 
-					sh 'ls -la'
+					sh 'ls -la /var/jenkins_home/workspace/delivery-platform-github_${BRANCH_NAME} || true'
 					sh 'ls -la zap-report-*.html zap-report-*.json || true'
 				}
 			}
 		}
+		
         
     }
 
