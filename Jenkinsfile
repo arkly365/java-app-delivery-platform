@@ -202,14 +202,17 @@ pipeline {
 
 					sh """
 						docker run --rm \
+						  --user root \
 						  -v "$WORKSPACE:/zap/wrk" \
 						  ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
 						  -t ${targetUrl} \
 						  -r ${reportPrefix}.html \
 						  -J ${reportPrefix}.json \
-						  -d \
 						  || true
 					"""
+
+					sh 'ls -la'
+					sh 'ls -la zap-report-*.html zap-report-*.json || true'
 				}
 			}
 		}
@@ -219,6 +222,6 @@ pipeline {
     post {
         always {
 			archiveArtifacts artifacts: 'trivy-image-report.txt, zap-report-*.html, zap-report-*.json', fingerprint: true, allowEmptyArchive: true
-        }
+		}
     }
 }
